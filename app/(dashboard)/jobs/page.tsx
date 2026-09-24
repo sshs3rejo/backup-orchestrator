@@ -8,8 +8,6 @@ import {
   Clock,
   MoreVertical,
   Play,
-  Pause,
-  Settings,
   Trash2,
   Plus,
   RefreshCw,
@@ -118,8 +116,24 @@ export default function JobsPage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [jobsData, dbsData] = await Promise.all([
+          jobsApi.getAll(),
+          databasesApi.getAll(),
+        ])
+        if (cancelled) return
+        setJobs(jobsData)
+        setDatabases(dbsData)
+      } catch {
+        if (!cancelled) toast.error("Erro ao carregar dados")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const getDatabaseName = (databaseId: string) => {
     return databases.find((db) => db.id === databaseId)?.name || "Desconhecido"

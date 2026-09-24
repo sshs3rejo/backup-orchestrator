@@ -9,8 +9,6 @@ import {
   Settings,
   Calendar,
   HardDrive,
-  Activity,
-  Shield,
   FolderTree,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -25,8 +23,6 @@ const navigation = [
 ]
 
 const secondaryNavigation = [
-  { name: "Atividade", href: "/activity", icon: Activity },
-  { name: "Segurança", href: "/security", icon: Shield },
   { name: "Configurações", href: "/settings", icon: Settings },
 ]
 
@@ -115,12 +111,8 @@ export function AppSidebar() {
             {/* Status */}
             <li className="mt-auto">
               <div className="rounded-lg bg-secondary/50 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                  <span className="text-xs font-medium text-foreground">Worker Ativo</span>
-                </div>
                 <p className="text-xs text-muted-foreground">
-                  Última verificação: há 2 min
+                  Backups executados via worker local (pg_dump + rclone)
                 </p>
               </div>
             </li>

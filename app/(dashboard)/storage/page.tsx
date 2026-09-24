@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
 import { storageApi } from "@/lib/api"
-import type { RemoteInfo } from "@/lib/api"
+import type { RemoteInfo } from "@/lib/types"
 import { AddRemoteDialog } from "@/components/dialogs/add-remote-dialog"
 
 function formatBytes(bytes: number): string {
@@ -44,15 +44,12 @@ export default function StoragePage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [remotesData, usageData] = await Promise.all([
-        storageApi.getRemotes(),
-        storageApi.getUsage(),
-      ])
-      setRemotes(remotesData.remotes)
+      const data = await storageApi.getRemotes()
+      setRemotes(data.remotes)
       setUsage({
-        used: usageData.used || 0,
-        total: usageData.total || 0,
-        free: usageData.free || 0,
+        used: data.usage.used || 0,
+        total: data.usage.total || 0,
+        free: data.usage.free || 0,
       })
     } catch {
       // Silent fail - server might not be ready
@@ -105,17 +102,6 @@ export default function StoragePage() {
     } finally {
       setTestingRemote(null)
     }
-  }
-
-  const handleCleanup = () => {
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 3000)),
-      {
-        loading: "Executando limpeza de arquivos antigos...",
-        success: "Limpeza concluída!",
-        error: "Falha na limpeza",
-      }
-    )
   }
 
   return (
@@ -358,26 +344,6 @@ export default function StoragePage() {
             </Card>
 
             {/* Recent Uploads / Retention placeholder */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground">Ações</CardTitle>
-                <CardDescription>
-                  Gerenciamento de armazenamento e uploads
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3">
-                  <Button variant="outline" onClick={handleCleanup}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Limpar Arquivos Antigos
-                  </Button>
-                  <Button variant="outline" onClick={() => setAddDialogOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Novo Remote
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           </>
         )}
       </div>

@@ -1,9 +1,5 @@
 import { prisma } from "@/lib/prisma"
-
-export interface AppSettings {
-  defaultRemote: string
-  storageBackupPath: string
-}
+import type { AppSettings } from "@/lib/types"
 
 const defaults: AppSettings = {
   defaultRemote: "",
@@ -26,8 +22,8 @@ export async function saveSettings(partial: Partial<AppSettings>): Promise<AppSe
 
   await prisma.appConfig.upsert({
     where: { id: "singleton" },
-    update: { data: updated as any },
-    create: { id: "singleton", data: updated as any },
+    update: { data: updated },
+    create: { id: "singleton", data: updated },
   })
 
   return updated

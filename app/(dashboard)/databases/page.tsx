@@ -110,7 +110,7 @@ export default function DatabasesPage() {
       await databasesApi.delete(db.id)
       toast.success(`${db.name} removido!`)
       loadDatabases()
-    } catch (error) {
+    } catch {
       toast.error("Falha ao remover banco")
     }
   }

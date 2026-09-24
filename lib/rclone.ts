@@ -10,9 +10,9 @@ import type {
   StorageUsage,
   TestResult,
   UploadResult,
-} from "./rclone-types"
+} from "./types"
 
-function getRcloneBinary(): string {
+export function getRcloneBinary(): string {
   if (process.env.RCLONE_EXECUTABLE) return process.env.RCLONE_EXECUTABLE
   return path.resolve(
     process.cwd(),
@@ -23,7 +23,7 @@ function getRcloneBinary(): string {
   )
 }
 
-function getConfigPath(): string {
+export function getConfigPath(): string {
   return (
     process.env.RCLONE_CONFIG_PATH ||
     path.join(os.tmpdir(), "backup-service-rclone.conf")
@@ -44,6 +44,8 @@ function ensureConfigDir(): void {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
   }
 }
+
+export { ensureConfigDir }
 
 async function syncDbToConfigFile(): Promise<void> {
   const remotes = await prisma.remote.findMany()
@@ -94,12 +96,13 @@ async function syncConfigFileToDb(): Promise<void> {
   }
 
   for (const [name, config] of Object.entries(parsed)) {
-    const type = config.type || "drive"
-    const { type: _, ...rest } = config
+    const rest = { ...config }
+    const type = rest.type || "drive"
+    delete rest.type
     await prisma.remote.upsert({
       where: { name },
-      update: { type, config: rest as any },
-      create: { name, type, config: rest as any },
+      update: { type, config: rest },
+      create: { name, type, config: rest },
     })
   }
 }
@@ -187,8 +190,8 @@ export async function createRemote(
 
   await prisma.remote.upsert({
     where: { name },
-    update: { type, config: config as any },
-    create: { name, type, config: config as any },
+    update: { type, config },
+    create: { name, type, config },
   })
 
   await syncDbToConfigFile()
@@ -203,7 +206,7 @@ export async function updateRemote(
 
   await prisma.remote.update({
     where: { name },
-    data: { config: config as any },
+    data: { config },
   })
 
   await syncDbToConfigFile()
@@ -298,27 +301,6 @@ export async function getProviders(): Promise<ProviderInfo[]> {
     return []
   }
 }
-
-export async function getProviderOptions(type: string): Promise<RemoteOption[]> {
-  try {
-    const providers = await getProviders()
-    const provider = providers.find((p) => p.name === type)
-    return provider?.options || []
-  } catch {
-    return []
-  }
-}
-
-export async function configFile(): Promise<string> {
-  try {
-    const output = await runRcloneCommand("config", "file")
-    return output
-  } catch {
-    return getConfigPath()
-  }
-}
-
-export { getConfigPath }
 
 export interface FileEntry {
   name: string

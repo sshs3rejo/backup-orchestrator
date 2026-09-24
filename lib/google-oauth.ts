@@ -1,8 +1,6 @@
-import path from "path"
-import os from "os"
 import { spawn, type ChildProcess } from "child_process"
 import { randomBytes } from "crypto"
-import fs from "fs"
+import { getRcloneBinary, getConfigPath, ensureConfigDir } from "@/lib/rclone"
 
 interface OAuthSession {
   process: ChildProcess | null
@@ -13,31 +11,6 @@ interface OAuthSession {
 
 const sessions = new Map<string, OAuthSession>()
 const TIMEOUT = 5 * 60 * 1000
-
-function getRcloneBinary(): string {
-  if (process.env.RCLONE_EXECUTABLE) return process.env.RCLONE_EXECUTABLE
-  return path.resolve(
-    process.cwd(),
-    "node_modules",
-    "rclone.js",
-    "bin",
-    `rclone${process.platform === "win32" ? ".exe" : ""}`
-  )
-}
-
-function getConfigPath(): string {
-  return (
-    process.env.RCLONE_CONFIG_PATH ||
-    path.join(os.tmpdir(), "backup-service-rclone.conf")
-  )
-}
-
-function ensureConfigDir(): void {
-  const dir = path.dirname(getConfigPath())
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
-  }
-}
 
 export interface StartOAuthResult {
   state: string

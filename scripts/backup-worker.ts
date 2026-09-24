@@ -1,11 +1,58 @@
-import { exec } from 'child_process'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { prisma } from '../lib/prisma'
-import { promisify } from 'util'
 import { uploadFile, listRemotes } from '../lib/rclone'
 
-const execAsync = promisify(exec)
+// Marca como falhas as runs "running" que não responderam em 5 minutos.
+// Executado no start do worker — substitui o antigo PATCH /api/runs.
+async function cleanupStuckRuns() {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+  const { count } = await prisma.backupRun.updateMany({
+    where: {
+      status: 'running',
+      startedAt: { lt: fiveMinutesAgo },
+    },
+    data: {
+      status: 'failed',
+      error: 'Timeout - backup não respondeu em 5 minutos',
+      finishedAt: new Date(),
+    },
+  })
+  if (count > 0) console.log(`[cleanup] ${count} run(s) travada(s) marcada(s) como failed`)
+}
+
+// Marca como falhas runs bem-sucedidas cujo arquivo local desapareceu.
+async function cleanupMissingFiles() {
+  const runs = await prisma.backupRun.findMany({
+    where: {
+      status: 'success',
+      filePath: { not: null },
+    },
+  })
+
+  let cleaned = 0
+  for (const run of runs) {
+    if (!run.filePath) continue
+    if (run.filePath.includes(':')) continue // path remoto (remote:...)
+
+    try {
+      await fs.access(run.filePath)
+    } catch {
+      await prisma.backupRun.update({
+        where: { id: run.id },
+        data: {
+          status: 'failed',
+          filePath: null,
+          size: null,
+          error: 'Arquivo de backup não encontrado no disco',
+          finishedAt: run.finishedAt || new Date(),
+        },
+      })
+      cleaned++
+    }
+  }
+  if (cleaned > 0) console.log(`[cleanup] ${cleaned} run(s) com arquivo sumido marcada(s) como failed`)
+}
 
 interface BackupOptions {
   runId: string
@@ -191,6 +238,14 @@ async function processPendingRuns() {
 }
 
 async function main() {
+  // Limpeza automática no start (runs travadas / arquivos sumidos)
+  try {
+    await cleanupStuckRuns()
+    await cleanupMissingFiles()
+  } catch (error) {
+    console.error('[cleanup] erro na limpeza inicial:', error)
+  }
+
   const args = process.argv.slice(2)
 
   if (args.length === 0) {

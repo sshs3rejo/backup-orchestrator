@@ -12,7 +12,6 @@ import {
   ChevronUp,
   ExternalLink,
   LogIn,
-  Copy,
   Key,
   RefreshCw,
 } from "lucide-react"
@@ -30,7 +29,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
-import { oauthApi } from "@/lib/api"
+import { oauthApi, storageApi } from "@/lib/api"
 
 interface AddRemoteDialogProps {
   open: boolean
@@ -59,6 +58,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
   const pollingRef = useRef(false)
   const [oauthState, setOauthState] = useState<string | null>(null)
   const popupRef = useRef<Window | null>(null)
+  const [popupOpen, setPopupOpen] = useState(false)
 
   const [pastedToken, setPastedToken] = useState("")
   const [checkingNow, setCheckingNow] = useState(false)
@@ -83,6 +83,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
       popupRef.current.close()
     }
     popupRef.current = null
+    setPopupOpen(false)
     setPastedToken("")
     setCheckingNow(false)
   }
@@ -119,6 +120,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
         "width=600,height=700,left=200,top=100"
       )
       popupRef.current = w
+      setPopupOpen(Boolean(w))
     } catch (error) {
       setOauthError(error instanceof Error ? error.message : "Falha ao iniciar autenticação")
       setIsPolling(false)
@@ -139,18 +141,21 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
         if (popupRef.current && !popupRef.current.closed) {
           popupRef.current.close()
         }
+        setPopupOpen(false)
         return
       }
       if (result.status === "error") {
         setOauthError(result.error || "Erro na autenticação")
         setIsPolling(false)
         pollingRef.current = false
+        setPopupOpen(false)
         return
       }
       if (result.status === "expired") {
         setOauthError(result.error || "Tempo excedido. Tente novamente.")
         setIsPolling(false)
         pollingRef.current = false
+        setPopupOpen(false)
         return
       }
       toast.info("Ainda aguardando autorização do Google...")
@@ -170,6 +175,9 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
     async function poll() {
       if (!pollingRef.current || cancelled || !oauthState) return
 
+      // Popup fechado pelo usuário sem concluir? Atualiza o estado de renderização.
+      if (popupRef.current && popupRef.current.closed) setPopupOpen(false)
+
       try {
         const result = await oauthApi.checkStatus(oauthState)
 
@@ -183,6 +191,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
           if (popupRef.current && !popupRef.current.closed) {
             popupRef.current.close()
           }
+          setPopupOpen(false)
           return
         }
 
@@ -190,6 +199,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
           setOauthError(result.error || "Erro na autenticação")
           setIsPolling(false)
           pollingRef.current = false
+          setPopupOpen(false)
           return
         }
 
@@ -197,6 +207,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
           setOauthError(result.error || "Tempo excedido. Tente novamente.")
           setIsPolling(false)
           pollingRef.current = false
+          setPopupOpen(false)
           return
         }
 
@@ -234,28 +245,13 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
     try {
       const config = buildConfig()
 
-      const createRes = await fetch("/api/storage/remotes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: remoteName, type: "drive", config }),
-      })
+      await storageApi.createRemote(remoteName, "drive", config)
 
-      if (!createRes.ok) {
-        const err = await createRes.json()
-        throw new Error(err.error || "Falha ao criar remote")
-      }
-
-      const testRes = await fetch(`/api/storage/remotes/${encodeURIComponent(remoteName)}/test`, {
-        method: "POST",
-      })
-
-      const result = await testRes.json()
+      const result = await storageApi.testRemote(remoteName)
       setTestResult(result)
 
       if (!result.success) {
-        await fetch(`/api/storage/remotes/${encodeURIComponent(remoteName)}`, {
-          method: "DELETE",
-        })
+        await storageApi.deleteRemote(remoteName)
       }
     } catch (error) {
       setTestResult({
@@ -417,7 +413,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
                   <div className="flex items-center justify-center mb-4">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                  {popupRef.current && !popupRef.current.closed ? (
+                  {popupOpen ? (
                     <>
                       <p className="text-sm font-medium text-foreground">
                         Faça login no Google na janela aberta
@@ -445,7 +441,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
                         Aguardando autorização...
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
-                        Se você já autorizou, clique em "Verificar"
+                        Se você já autorizou, clique em &quot;Verificar&quot;
                       </p>
                       <Button
                         variant="outline"
@@ -567,7 +563,7 @@ export function AddRemoteDialog({ open, onOpenChange, onSuccess }: AddRemoteDial
               <div className="flex flex-col items-center gap-4 py-6">
                 <Cloud className="h-12 w-12 text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground text-center">
-                  Clique em "Testar Conexão" para verificar as credenciais
+                  Clique em &quot;Testar Conexão&quot; para verificar as credenciais
                 </p>
                 <Button onClick={handleTest}>Testar Conexão</Button>
               </div>

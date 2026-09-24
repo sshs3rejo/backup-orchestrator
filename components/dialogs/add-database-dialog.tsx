@@ -60,7 +60,7 @@ export function AddDatabaseDialog({ onDatabaseAdded }: AddDatabaseDialogProps) {
         password: "",
       })
       onDatabaseAdded?.()
-    } catch (error) {
+    } catch {
       toast.error("Falha ao adicionar banco de dados")
     } finally {
       setLoading(false)

@@ -12,7 +12,7 @@ export async function PUT(
     const { isActive } = body
 
     if (typeof isActive !== "boolean") {
-      return NextResponse.json({ error: "isActive (boolean) is required" }, { status: 400 })
+      return NextResponse.json({ error: "isActive (boolean) é obrigatório" }, { status: 400 })
     }
 
     const job = await prisma.backupJob.update({
@@ -32,9 +32,9 @@ export async function PUT(
     })
   } catch (error) {
     if (error instanceof Error && error.message.includes("RecordNotFound")) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 })
+      return NextResponse.json({ error: "Job não encontrado" }, { status: 404 })
     }
-    return NextResponse.json({ error: "Failed to update job" }, { status: 500 })
+    return NextResponse.json({ error: "Falha ao atualizar job" }, { status: 500 })
   }
 }
 
@@ -49,8 +49,8 @@ export async function DELETE(
     return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof Error && error.message.includes("RecordNotFound")) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 })
+      return NextResponse.json({ error: "Job não encontrado" }, { status: 404 })
     }
-    return NextResponse.json({ error: "Failed to delete job" }, { status: 500 })
+    return NextResponse.json({ error: "Falha ao deletar job" }, { status: 500 })
   }
 }

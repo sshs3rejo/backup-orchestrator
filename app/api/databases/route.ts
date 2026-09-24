@@ -9,14 +9,14 @@ export async function GET() {
     return NextResponse.json(databases)
   } catch (error) {
     console.error('Error fetching databases:', error)
-    return NextResponse.json({ error: 'Failed to fetch databases' }, { status: 500 })
+    return NextResponse.json({ error: 'Falha ao buscar bancos' }, { status: 500 })
   }
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { name, type, connectionUrl, host, port, database, username, password } = body
+    const { name, type, host, port, database, username, password } = body
 
     const fullConnectionUrl = `postgresql://${username}:${password}@${host}:${port}/${database}`
 
@@ -33,6 +33,6 @@ export async function POST(request: Request) {
     return NextResponse.json(db, { status: 201 })
   } catch (error) {
     console.error('Error creating database:', error)
-    return NextResponse.json({ error: 'Failed to create database' }, { status: 500 })
+    return NextResponse.json({ error: 'Falha ao criar banco' }, { status: 500 })
   }
 }

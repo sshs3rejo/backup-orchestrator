@@ -6,7 +6,7 @@ import {
   Folder,
   File,
   FileText,
-  Image,
+  Image as ImageIcon,
   Archive,
   ChevronRight,
   ChevronLeft,
@@ -49,10 +49,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { fileApi, storageApi } from "@/lib/api"
-import type { FileEntry, RemoteInfo } from "@/lib/api"
+import type { FileEntry, RemoteInfo } from "@/lib/types"
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "—"
@@ -70,7 +69,7 @@ function formatDate(dateStr: string): string {
 function FileIcon({ entry }: { entry: FileEntry }) {
   if (entry.isDir) return <Folder className="h-4 w-4 text-primary shrink-0" />
   const ext = entry.name.split(".").pop()?.toLowerCase()
-  if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext || "")) return <Image className="h-4 w-4 text-info shrink-0" />
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext || "")) return <ImageIcon className="h-4 w-4 text-info shrink-0" />
   if (["zip", "tar", "gz", "rar", "7z"].includes(ext || "")) return <Archive className="h-4 w-4 text-warning shrink-0" />
   if (["pdf", "doc", "docx", "txt", "csv", "json", "xml"].includes(ext || "")) return <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
   return <File className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -93,11 +92,10 @@ function ExplorerContent() {
   const [uploading, setUploading] = useState(false)
 
   const [remotes, setRemotes] = useState<RemoteInfo[]>([])
-  const [loadingRemotes, setLoadingRemotes] = useState(false)
+  const [loadingRemotes, setLoadingRemotes] = useState(true)
 
   const fetchFiles = useCallback(async () => {
     if (!remoteName) return
-    setLoading(true)
     try {
       const data = await fileApi.list(remoteName, currentPath)
       setFiles(data.files)
@@ -109,14 +107,23 @@ function ExplorerContent() {
   }, [remoteName, currentPath])
 
   useEffect(() => {
-    if (remoteName) {
-      fetchFiles()
-    }
-  }, [fetchFiles, remoteName])
+    if (!remoteName) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await fileApi.list(remoteName, currentPath)
+        if (!cancelled) setFiles(data.files)
+      } catch {
+        if (!cancelled) toast.error("Erro ao carregar arquivos")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [remoteName, currentPath])
 
   useEffect(() => {
     if (!remoteName) {
-      setLoadingRemotes(true)
       storageApi.getRemotes()
         .then((data) => setRemotes(data.remotes))
         .catch(() => {})
@@ -182,12 +189,14 @@ function ExplorerContent() {
   }
 
   function navigateTo(path: string) {
+    setLoading(true)
     setCurrentPath(path)
   }
 
   function goUp() {
     const parts = currentPath.split("/").filter(Boolean)
     parts.pop()
+    setLoading(true)
     setCurrentPath(parts.length > 0 ? "/" + parts.join("/") : "")
   }
 

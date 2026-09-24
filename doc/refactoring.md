@@ -12,13 +12,15 @@ Este documento descreve o **estado atual** do `backup-service`, o **alvo** funci
 | **Dados na UI** | Conexão real via fetch às APIs REST; dashboard com dados do backend; históricos, jobs, databases, settings reais. |
 | **Ações na UI** | Backup manual, testar conexão, criar/deletar databases e jobs, upload Google Drive — tudo real via API. |
 | **`app/api`** | REST completo: CRUD databases, jobs, runs, stats, settings, storage (remotes, OAuth, upload, files). |
-| **Worker** | `scripts/backup-worker.ts` — loop com polling a cada 30s, executa `pg_dump`, atualiza `BackupRun`, faz upload opcional ao Google Drive via rclone. |
+| **Worker** | `scripts/backup-worker.ts` — executa `pg_dump`, atualiza `BackupRun`, faz upload opcional ao Google Drive via rclone. Disparado sob demanda (`--run <id>` / `--database <id>`); no start faz limpeza de runs travadas e com arquivo sumido. (Loop de polling não existe — agendamento real é pendência.) |
 | **Storage** | Rclone wrapper (`lib/rclone.ts`) com spawn do binário embutido `rclone.js`. Configs armazenadas no banco PostgreSQL (tabela `Remote`), sincronizadas para arquivo INI temporário em `/tmp/` antes de cada comando rclone. OAuth tokens refrescados pelo rclone são lidos de volta para o banco automaticamente. |
 | **Google OAuth** | `lib/google-oauth.ts` — fluxo via `rclone authorize "drive" --auth-no-open-browser`, extrai URL de `127.0.0.1:53682/auth?state=...` do stderr, aguarda processo finalizar com token no stdout. Usa o mesmo temp config path que o rclone wrapper. |
 | **File Manager** | Página `/storage/explorer` com breadcrumbs, listagem de arquivos/pastas, upload, nova pasta, renomear, deletar, download. Sidebar com link "Arquivos". |
 | **Settings** | `lib/settings.ts` — leitura/escrita da tabela `AppConfig` via Prisma (singleton). |
 | **Infra dev** | Build e lint OK; Docker Compose com PostgreSQL 16; configs de rclone e app no banco, não em arquivos locais. |
-| **`layout/`** | Cópia de referência do v0; excluída de `tsconfig` e `eslint` — candidata a remoção ou arquivamento quando não for mais necessária. |
+| **`layout/`** | ~~Cópia de referência do v0~~ — **removida**. |
+
+**API** | REST consolidado em 11 rotas (databases, jobs, runs, settings, stats, storage/remotes, storage/remotes/[name]/files, storage/oauth). Sem PATCH mágico; cleanup de runs via `POST /api/runs` e no start do worker. |
 
 ---
 
@@ -55,8 +57,8 @@ Este documento descreve o **estado atual** do `backup-service`, o **alvo** funci
 
 ### Epic 2 — Worker e execução do dump
 
-- [x] **2.1** Script **`scripts/backup-worker.ts`** com polling.
-- [x] **2.2** Invocar **`pg_dump`** via `child_process`; `PG_DUMP_PATH` do env ou PATH.
+- [x] **2.1** Script **`scripts/backup-worker.ts`** — disparado sob demanda por request (`--run <id>` / `--database <id>`); no start faz cleanup de runs travadas e com arquivo sumido.
+- [x] **2.2** Invocar **`pg_dump`** via `child_process` (spawn sem shell, `pg_dump` do PATH).
 - [x] **2.3** Atualizar `BackupRun` (running → success/failed) com exit code e logs.
 - [ ] **2.4** (Opcional fase 2) Suporte **MySQL** / **MongoDB**.
 
@@ -64,14 +66,14 @@ Este documento descreve o **estado atual** do `backup-service`, o **alvo** funci
 
 - [x] **3.1** Estratégia: **rclone** com wrapper em `lib/rclone.ts`.
 - [x] **3.2** Módulo `uploadFileToRemote()` + `listFiles()`, `downloadFile()`, `deleteFile()`, `createDir()`, `renameItem()`.
-- [x] **3.3** Conexão worker: pós-dump bem-sucedido → upload via rclone (se `STORAGE_UPLOAD_ENABLED=true`).
+- [x] **3.3** Conexão worker: pós-dump bem-sucedido → upload via rclone (controle via `DEFAULT_RCLONE_REMOTE` + `STORAGE_BACKUP_PATH`).
 - [x] **3.4** OAuth integrado via `rclone authorize` — sem necessidade de Google Cloud Console para o usuário final.
 - [x] **3.5** File manager na UI (`/storage/explorer`) com upload, download, rename, delete, nova pasta.
 
 ### Epic 4 — Agendamento
 
 - [ ] **4.1** Persistir expressão cron / próxima execução nos jobs no BD.
-- [x] **4.2** Mecanismo atual: **worker com polling a cada 30s** avaliando jobs ativos.
+- [x] **4.2** Disparo manual via **`POST /api/runs`** (spawn do worker por request). **Agendamento automático ainda é pendência** — não há loop de polling.
 - [ ] **4.3** (Opcional robusto) Fila (**BullMQ** + Redis ou similar): API enfileira; worker consome; retries e backoff.
 
 ### Epic 5 — Retenção, segurança e operação
@@ -82,8 +84,8 @@ Este documento descreve o **estado atual** do `backup-service`, o **alvo** funci
 
 ### Repo e higiene
 
-- [ ] **R.1** Remover ou mover `layout/` para fora da árvore de build (ou documentar uso exclusivo como "design reference").
-- [ ] **R.2** Rotas faltantes no menu (**`/activity`**, **`/security`**) ou remover links no `app-sidebar` até existirem páginas — evitar 404 silenciosa.
+- [x] **R.1** Remover ou mover `layout/` para fora da árvore de build (ou documentar uso exclusivo como "design reference"). — **layout/ removido**.
+- [x] **R.2** Rotas faltantes no menu (**`/activity`**, **`/security`**) ou remover links no `app-sidebar` até existirem páginas — evitar 404 silenciosa. — **links removidos** (desktop + mobile).
 - [x] **R.3** Adicionar item "Arquivos" na sidebar (mobile e desktop).
 
 ### Segredos e segurança
@@ -109,12 +111,11 @@ Este documento descreve o **estado atual** do `backup-service`, o **alvo** funci
 
 Variáveis a documentar:
 
-- `DATABASE_URL` — string de conexão do BD da aplicação.
-- `PG_DUMP_PATH` — caminho absoluto no Windows/Linux (fallback para PATH).
-- `STORAGE_UPLOAD_ENABLED` — `"true"` para ativar upload pós-dump.
-- `STORAGE_UPLOAD_REMOTE` — nome do remote rclone destino.
-- `STORAGE_UPLOAD_PATH` — pasta no remote (ex.: `Backups`).
-- `RCLONE_CONFIG_PATH` — caminho customizado do `rclone.conf`.
+- `DATABASE_URL` — **obrigatória**; string de conexão do BD da aplicação (também exigida pelo `prisma generate` via `prisma.config.ts`).
+- `RCLONE_EXECUTABLE` — opcional; caminho customizado do binário rclone (fallback: `node_modules/rclone.js/bin/rclone`).
+- `RCLONE_CONFIG_PATH` — opcional; caminho customizado do `rclone.conf` (fallback: `/tmp/backup-service-rclone.conf`).
+- `DEFAULT_RCLONE_REMOTE` — opcional; remote padrão usado pelo worker no upload pós-dump (fallback: primeiro remote tipo `drive`).
+- `STORAGE_BACKUP_PATH` — opcional; pasta destino no remote (default: `/backups`).
 
 ---
 
@@ -122,6 +123,7 @@ Variáveis a documentar:
 
 | Data       | Mudança |
 |------------|---------|
+| 2026-09-23 | **Refundação no lugar**: 38 componentes `ui/*` não usados removidos (17 mantidos); API consolidada de 16 → 11 rotas (usage+providers fundidos em `GET /storage/remotes`, OAuth em 1 arquivo, POST/DELETE em `[name]`, files em `/remotes`); PATCH de cleanup removido (movido para `POST /api/runs` + start do worker); tipos consolidados em `lib/types.ts` (rclone-types deletado); sidebar e pages podadas (sem /activity, /security, sem status fake de worker, sem botão de limpeza fake); `lib/mock-data.ts` e `package-lock.json` deletados; helpers rclone deduplicados (google-oauth importa de `lib/rclone.ts`); mensagens de API padronizadas em pt. |
 | 2026-05-04 | Reestruturado: estado atual, épicos, checklist de tasks, referência de env, item de repo/higiene. |
 | 2026-05-10 | Implementado Prisma ORM, schema e migrations |
 | 2026-05-10 | Criadas API Routes REST (CRUD databases, jobs, runs, stats) |

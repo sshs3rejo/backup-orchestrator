@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json(settings)
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to save settings" },
+      { error: error instanceof Error ? error.message : "Falha ao salvar settings" },
       { status: 500 }
     )
   }

@@ -58,7 +58,7 @@ export function RunBackupDialog({ onBackupStarted }: RunBackupDialogProps) {
       setSelectedDatabase("")
       setSkipRetention(false)
       onBackupStarted?.()
-    } catch (error) {
+    } catch {
       toast.error("Falha ao iniciar backup")
     } finally {
       setLoading(false)

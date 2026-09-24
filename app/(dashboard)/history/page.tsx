@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { runsApi } from "@/lib/api"
-import type { BackupStatus } from "@/lib/types"
+import type { BackupRun, BackupStatus } from "@/lib/types"
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B"
@@ -93,23 +93,23 @@ export default function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [dateFilter, setDateFilter] = useState<string>("all")
-  const [runsList, setRunsList] = useState<any[]>([])
+  const [runsList, setRunsList] = useState<BackupRun[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadRuns()
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await runsApi.getAll()
+        if (!cancelled) setRunsList(data)
+      } catch (error) {
+        if (!cancelled) console.error('Error loading runs:', error)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
   }, [])
-
-  async function loadRuns() {
-    try {
-      const data = await runsApi.getAll()
-      setRunsList(data)
-    } catch (error) {
-      console.error('Error loading runs:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const filteredRuns = runsList.filter((run) => {
     const matchesSearch = run.databaseName?.toLowerCase().includes(searchQuery.toLowerCase())

@@ -80,12 +80,9 @@ export function MobileNav() {
 
           {/* Footer */}
           <div className="border-t border-sidebar-border p-4">
-            <div className="rounded-lg bg-secondary/50 p-3">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                <span className="text-xs font-medium text-foreground">Worker Ativo</span>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Backups executados via worker local (pg_dump + rclone)
+            </p>
           </div>
         </div>
       </SheetContent>

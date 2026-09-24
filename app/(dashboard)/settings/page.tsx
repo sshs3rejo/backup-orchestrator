@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { storageApi, settingsApi } from "@/lib/api"
-import type { RemoteInfo, AppSettings } from "@/lib/api"
+import type { RemoteInfo } from "@/lib/types"
 import { AddRemoteDialog } from "@/components/dialogs/add-remote-dialog"
 
 export default function SettingsPage() {
@@ -76,8 +76,25 @@ export default function SettingsPage() {
   }, [])
 
   useEffect(() => {
-    fetchAll()
-  }, [fetchAll])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [remoteData, settingsData] = await Promise.all([
+          storageApi.getRemotes(),
+          settingsApi.get(),
+        ])
+        if (cancelled) return
+        setRemotes(remoteData.remotes)
+        setDefaultRemote(settingsData.defaultRemote || "")
+        setBackupPath(settingsData.storageBackupPath || "/backups")
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const handleSave = async () => {
     try {

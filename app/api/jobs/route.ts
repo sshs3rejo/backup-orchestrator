@@ -21,7 +21,7 @@ export async function GET() {
     return NextResponse.json(formattedJobs)
   } catch (error) {
     console.error('Error fetching jobs:', error)
-    return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 })
+    return NextResponse.json({ error: 'Falha ao buscar jobs' }, { status: 500 })
   }
 }
 
@@ -44,6 +44,6 @@ export async function POST(request: Request) {
     return NextResponse.json(job, { status: 201 })
   } catch (error) {
     console.error('Error creating job:', error)
-    return NextResponse.json({ error: 'Failed to create job' }, { status: 500 })
+    return NextResponse.json({ error: 'Falha ao criar job' }, { status: 500 })
   }
 }

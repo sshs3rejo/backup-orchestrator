@@ -22,18 +22,6 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        await fetch('/api/runs', { 
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'cleanup-stuck' })
-        })
-        
-        await fetch('/api/runs', { 
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'cleanup-missing-files' })
-        })
-
         const [statsData, runsData, dbsData] = await Promise.all([
           statsApi.get(),
           runsApi.getAll(),

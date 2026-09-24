@@ -1,37 +1,33 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const db = await prisma.database.findUnique({
-      where: { id },
-    })
-    if (!db) {
-      return NextResponse.json({ error: 'Database not found' }, { status: 404 })
-    }
-    return NextResponse.json(db)
-  } catch (error) {
-    console.error('Error fetching database:', error)
-    return NextResponse.json({ error: 'Failed to fetch database' }, { status: 500 })
-  }
-}
-
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const body = await request.json()
-    
+    const body = (await request.json()) as {
+      name?: string
+      type?: string
+      isActive?: boolean
+      connectionUrl?: string
+      host?: string
+      port?: string
+      database?: string
+      username?: string
+      password?: string
+    }
+
     // Protect against Mass-Assignment: Destructure only allowed properties
     const { name, type, isActive, connectionUrl, host, port, database, username, password } = body
-    
-    const updateData: Record<string, any> = {}
+
+    const updateData: {
+      name?: string
+      type?: string
+      isActive?: boolean
+      connectionUrl?: string
+    } = {}
     if (name !== undefined) updateData.name = name
     if (type !== undefined) updateData.type = type
     if (isActive !== undefined) updateData.isActive = isActive
@@ -46,7 +42,7 @@ export async function PUT(
       if (typeof connectionUrl === 'string' && connectionUrl.startsWith('postgresql://')) {
         updateData.connectionUrl = connectionUrl
       } else {
-        return NextResponse.json({ error: 'Invalid connectionUrl structure' }, { status: 400 })
+        return NextResponse.json({ error: 'Estrutura de connectionUrl inválida' }, { status: 400 })
       }
     }
 
@@ -57,7 +53,7 @@ export async function PUT(
     return NextResponse.json(db)
   } catch (error) {
     console.error('Error updating database:', error)
-    return NextResponse.json({ error: 'Failed to update database' }, { status: 500 })
+    return NextResponse.json({ error: 'Falha ao atualizar banco' }, { status: 500 })
   }
 }
 
@@ -73,6 +69,6 @@ export async function DELETE(
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting database:', error)
-    return NextResponse.json({ error: 'Failed to delete database' }, { status: 500 })
+    return NextResponse.json({ error: 'Falha ao deletar banco' }, { status: 500 })
   }
 }
